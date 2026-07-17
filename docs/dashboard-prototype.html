@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>炸量广告筛选回测看板 — 原型</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+  :root {
+    --bg: #F8F9FB;
+    --surface: #FFFFFF;
+    --text: #181B24;
+    --text-muted: #6B7280;
+    --text-subtle: #9CA3AF;
+    --border: #E5E7EB;
+    --red: #DC2626;
+    --green: #059669;
+    --blue: #2563EB;
+    --amber: #D97706;
+    --radius: 12px;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* ── Top Nav ── */
+  .top-nav {
+    display: flex; align-items: center;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 0 28px; height: 52px;
+    position: sticky; top: 0; z-index: 100;
+  }
+  .top-nav .logo {
+    font-weight: 700; font-size: 15px; color: var(--text);
+    margin-right: 36px; letter-spacing: -.3px;
+  }
+  .top-nav .logo span { color: var(--blue); }
+  .nav-tabs { display: flex; gap: 2px; }
+  .nav-tab {
+    padding: 7px 18px; border-radius: 8px;
+    font-size: 13px; font-weight: 500; color: var(--text-muted);
+    cursor: pointer; border: none; background: none;
+    transition: all .15s;
+  }
+  .nav-tab:hover { color: var(--text); background: var(--bg); }
+  .nav-tab.active { color: var(--blue); background: #EEF2FF; }
+  .nav-right { margin-left: auto; display: flex; gap: 14px; align-items: center; font-size: 13px; }
+  .nav-right select {
+    background: var(--bg); color: var(--text);
+    border: 1px solid var(--border); border-radius: 8px;
+    padding: 6px 10px; font-size: 13px; cursor: pointer;
+  }
+  .nav-right .dim { color: var(--text-muted); }
+
+  /* ── Main ── */
+  .main { max-width: 1200px; margin: 0 auto; padding: 32px 28px; }
+  .tab-content { display: none; }
+  .tab-content.active { display: block; }
+
+  /* ── 3-Beat Story Cards ── */
+  .story-cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; margin-bottom: 36px; }
+
+  .story-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 28px 26px 24px;
+    box-shadow: 0 1px 2px rgba(0,0,0,.03);
+  }
+  .story-card .card-title {
+    font-size: 15px; font-weight: 600;
+    color: var(--text); margin-bottom: 20px;
+  }
+  .story-card .hero {
+    margin-bottom: 14px;
+  }
+  .story-card .hero .metric-label {
+    font-size: 12px; color: var(--text-muted); margin-bottom: 2px;
+  }
+  .story-card .hero .metric-value {
+    font-size: 36px; font-weight: 700; line-height: 1.15;
+    font-variant-numeric: tabular-nums;
+  }
+  .story-card .hero .metric-sub {
+    font-size: 12px; color: var(--text-muted); margin-top: 2px;
+  }
+  .story-card .divider {
+    height: 1px; background: var(--border); margin-bottom: 14px;
+  }
+  .story-card .detail {
+    display: flex; justify-content: space-between; align-items: baseline;
+    font-size: 13px; padding: 2px 0;
+  }
+  .story-card .detail .dl { color: var(--text-muted); }
+  .story-card .detail .dv { font-weight: 500; font-variant-numeric: tabular-nums; }
+
+  @media (max-width: 900px) {
+    .story-cards { grid-template-columns: 1fr; }
+  }
+
+  .val-neg { color: var(--red); }
+  .val-pos { color: var(--green); }
+  .val-amb { color: var(--amber); }
+
+  @media (max-width: 900px) {
+    .story-cards { grid-template-columns: 1fr; }
+  }
+
+  /* ── Charts Row ── */
+  .charts-row { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin-bottom: 24px; }
+  .chart-panel {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 22px 24px;
+    box-shadow: 0 1px 2px rgba(0,0,0,.03);
+  }
+  .chart-panel h3 { font-size: 14px; font-weight: 600; margin-bottom: 18px; color: var(--text); }
+  .chart-panel h3 .muted { font-weight: 400; font-size: 12px; color: var(--text-muted); }
+  .chart-guide { font-size: 12px; color: var(--text-muted); margin-bottom: 14px; margin-top: -12px; line-height: 1.4; }
+  .chart-panel canvas { width: 100% !important; height: 260px !important; }
+  .chart-panel.wide { grid-column: 1 / -1; }
+  .chart-panel.wide canvas { height: 300px !important; }
+
+  /* ── Table ── */
+  .data-table {
+    width: 100%; border-collapse: collapse; font-size: 13px;
+    font-variant-numeric: tabular-nums;
+  }
+  .data-table th {
+    text-align: left; padding: 9px 14px; color: var(--text-muted);
+    font-weight: 500; font-size: 12px; border-bottom: 1px solid var(--border);
+  }
+  .data-table td {
+    padding: 9px 14px; border-bottom: 1px solid var(--border);
+  }
+  .data-table tr:hover td { background: var(--bg); }
+  .badge {
+    display: inline-block; padding: 2px 9px; border-radius: 99px;
+    font-size: 11px; font-weight: 600;
+  }
+  .badge.neg { background: #FEF2F2; color: var(--red); }
+  .badge.pos { background: #ECFDF5; color: var(--green); }
+
+  @media (max-width: 1000px) {
+    .charts-row { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ═══════ TOP NAV ═══════ -->
+<nav class="top-nav">
+  <div class="logo">Blast<span>Scope</span></div>
+  <div class="nav-tabs">
+    <button class="nav-tab active" data-tab="overview">概览</button>
+  </div>
+  <div class="nav-right">
+    <span class="dim">盈亏线 40%</span>
+    <select><option>最近 7 天</option><option>最近 14 天</option><option>最近 30 天</option></select>
+  </div>
+</nav>
+
+<div class="main">
+
+<!-- ═══════ TAB 1: 概览 ═══════ -->
+<section class="tab-content active" id="tab-overview">
+
+  <div class="story-cards">
+
+    <!-- Card 1: 这些广告烧了多少钱 -->
+    <div class="story-card">
+      <div class="card-title">命中规模</div>
+      <div class="hero">
+        <div class="metric-label">炸后毛利润</div>
+        <div class="metric-value">−$7,870</div>
+        <div class="metric-sub">总回收 $58,136 − 0.4 × 总消耗 $165,016 | 命中 1,947 条</div>
+      </div>
+      <div class="divider"></div>
+      <div class="detail"><span class="dl">炸后总回收</span><span class="dv">$58,136</span></div>
+      <div class="detail"><span class="dl">炸后总用户</span><span class="dv">32,237</span></div>
+      <div class="detail"><span class="dl">炸后付费用户</span><span class="dv">3,744</span></div>
+    </div>
+
+    <!-- Card 2: 效率发生了怎样的变化 -->
+    <div class="story-card">
+      <div class="card-title">效率变化</div>
+      <div class="hero">
+        <div class="metric-label">ROI · 炸前 → 炸后</div>
+        <div class="metric-value">60.0% → 35.2%</div>
+        <div class="metric-sub">下降 24.8pp</div>
+      </div>
+      <div class="divider"></div>
+      <div class="detail"><span class="dl">CPI · 炸前 → 炸后</span><span class="dv">$4.68 → $5.12</span></div>
+      <div class="detail"><span class="dl">付费率 · 炸前 → 炸后</span><span class="dv">16.3% → 11.6%</span></div>
+    </div>
+
+    <!-- Card 3: 有多大的风险敞口 -->
+    <div class="story-card">
+      <div class="card-title">空耗情况</div>
+      <div class="hero">
+        <div class="metric-label">炸后纯空耗广告占比</div>
+        <div class="metric-value">53.6%</div>
+        <div class="metric-sub">1,044 / 1,947 条</div>
+      </div>
+      <div class="divider"></div>
+      <div class="detail"><span class="dl">纯空耗广告炸后消耗</span><span class="dv">$29,458</span></div>
+      <div class="detail"><span class="dl">炸后亏损广告 (ROI &lt; 盈亏线)</span><span class="dv">1,544 条 · 79.3%</span></div>
+      <div class="detail"><span class="dl">炸后盈利广告 (ROI ≥ 盈亏线)</span><span class="dv">403 条 · 20.7%</span></div>
+    </div>
+
+  </div>
+
+  <div class="charts-row">
+    <div class="chart-panel">
+      <h3>ROI 趋势 <span class="muted">— 炸前 vs 炸后</span></h3>
+      <p class="chart-guide">横轴为日期，蓝线为当日命中广告的炸前平均 ROI，红线为炸后平均 ROI</p>
+      <canvas id="chartRoiTrend"></canvas>
+    </div>
+    <div class="chart-panel">
+      <h3>各消耗段 ROI 变化</h3>
+      <p class="chart-guide">横轴为炸前消耗分段，纵轴为该段广告炸后总盈亏，绿色盈利红色亏损</p>
+      <canvas id="chartCostBracket"></canvas>
+    </div>
+  </div>
+
+  <div class="charts-row">
+    <div class="chart-panel">
+      <h3>各炸前 ROI 段 ROI 变化</h3>
+      <p class="chart-guide">横轴为炸前 ROI 分段，纵轴为该段广告炸后总盈亏，绿色盈利红色亏损</p>
+      <canvas id="chartRoiBracket"></canvas>
+    </div>
+    <div class="chart-panel">
+      <h3>零回收 — 按消耗段</h3>
+      <p class="chart-guide">横轴为炸前消耗分段，红色为炸后零回收广告数，绿色为有回收广告数，堆叠高度为该段总广告数</p>
+      <canvas id="chartZeroRecovery"></canvas>
+    </div>
+  </div>
+</section>
+
+</div><!-- /.main -->
+
+<!-- ═══════ JS ═══════ -->
+<script>
+// Tab switching
+document.querySelectorAll('.nav-tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+    tab.classList.add('active');
+    document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+    document.getElementById('tab-' + tab.dataset.tab).classList.add('active');
+  });
+});
+
+
+// ═══════ CHARTS ═══════
+(function() {
+  const ctx = document.getElementById('chartRoiTrend');
+  if (!ctx) return;
+  const labels = ['5/10','5/11','5/12','5/13','5/14','5/15','5/16','5/17','5/18','5/19','5/20'];
+  new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [
+        { label: '炸前 ROI', data: [58,62,55,67,60,71,59,65,56,63,60], borderColor: '#2563EB', backgroundColor: 'transparent', tension: .3, pointRadius: 2, borderWidth: 2 },
+        { label: '炸后 ROI', data: [37,34,40,33,38,36,35,39,35,34,35], borderColor: '#DC2626', backgroundColor: 'transparent', tension: .3, pointRadius: 2, borderWidth: 2 },
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { labels: { color: '#6B7280', font: { size: 11 }, boxWidth: 12, padding: 16, usePointStyle: true } } },
+      scales: {
+        x: { title: { text: '日期', display: true, color: '#9CA3AF', font: { size: 11 } }, ticks: { color: '#9CA3AF', font: { size: 11 } }, grid: { color: '#F3F4F6' } },
+        y: { title: { text: 'ROI (%)', display: true, color: '#9CA3AF', font: { size: 11 } }, ticks: { color: '#9CA3AF', callback: v => v + '%', font: { size: 11 } }, grid: { color: '#F3F4F6' } }
+      }
+    }
+  });
+})();
+
+(function() {
+  const ctx = document.getElementById('chartCostBracket');
+  if (!ctx) return;
+  const data = [-2165,-1900,-1995,358,330,-1567,-931];
+  new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: ['$0-30','$30-60','$60-100','$100-200','$200-300','$300-500','$500+'],
+      datasets: [{ data, backgroundColor: data.map(v => v >= 0 ? 'rgba(5,150,105,0.7)' : 'rgba(220,38,38,0.6)'), borderRadius: 6 }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { title: { text: '炸前消耗段', display: true, color: '#9CA3AF', font: { size: 11 } }, ticks: { color: '#9CA3AF', font: { size: 11 } }, grid: { display: false } },
+        y: { title: { text: '总盈亏 ($)', display: true, color: '#9CA3AF', font: { size: 11 } }, ticks: { color: '#9CA3AF', callback: v => '$' + (v/1000).toFixed(0) + 'k', font: { size: 11 } }, grid: { color: '#F3F4F6' } }
+      }
+    }
+  });
+})();
+
+(function() {
+  const ctx = document.getElementById('chartRoiBracket');
+  if (!ctx) return;
+  const data = [-1900, -4200, -3100, -1880, -790];
+  new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: ['0-30%','30-60%','60-100%','100-200%','200%+'],
+      datasets: [{ data, backgroundColor: data.map(v => v >= 0 ? 'rgba(5,150,105,0.7)' : 'rgba(220,38,38,0.6)'), borderRadius: 6 }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { title: { text: '炸前 ROI 段', display: true, color: '#9CA3AF', font: { size: 11 } }, ticks: { color: '#9CA3AF', font: { size: 11 } }, grid: { display: false } },
+        y: { title: { text: '总盈亏 ($)', display: true, color: '#9CA3AF', font: { size: 11 } }, ticks: { color: '#9CA3AF', callback: v => '$' + (v/1000).toFixed(0) + 'k', font: { size: 11 } }, grid: { color: '#F3F4F6' } }
+      }
+    }
+  });
+})();
+
+(function() {
+  const ctx = document.getElementById('chartZeroRecovery');
+  if (!ctx) return;
+  new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: ['$0-30','$30-60','$60-100','$100-200','$200-300','$300-500','$500+'],
+      datasets: [
+        { label: '零回收', data: [323,494,296,166,61,42,19], backgroundColor: 'rgba(220,38,38,0.65)', borderRadius: 4 },
+        { label: '有回收', data: [137,408,338,150,28,47,72], backgroundColor: 'rgba(5,150,105,0.45)', borderRadius: 4 },
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { labels: { color: '#6B7280', font: { size: 11 }, boxWidth: 12, padding: 16, usePointStyle: true } } },
+      scales: {
+        x: { stacked: true, title: { text: '炸前消耗段', display: true, color: '#9CA3AF', font: { size: 11 } }, ticks: { color: '#9CA3AF', font: { size: 11 } }, grid: { display: false } },
+        y: { stacked: true, title: { text: '广告数', display: true, color: '#9CA3AF', font: { size: 11 } }, ticks: { color: '#9CA3AF', font: { size: 11 } }, grid: { color: '#F3F4F6' } }
+      }
+    }
+  });
+})();
+
+
+</script>
+
+</body>
+</html>
